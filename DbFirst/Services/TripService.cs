@@ -1,5 +1,6 @@
 ﻿using DbFirst.Context;
 using DbFirst.DTO;
+using DbFirst.Models;
 using DbFirst.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,6 +52,55 @@ namespace TripsApi.Services
             {
                 throw new ApplicationException("Error retrieving trips", ex);
             }
+        }
+
+        public async Task<int> AssignClientToTrip(int idTrip, AssignClientToTrip request)
+        {
+            var existingClient = await _context.Clients.FirstOrDefaultAsync(c => c.Pesel == request.Client.Pesel);
+            if (existingClient != null)
+            {
+                throw new InvalidOperationException("Client with provided PESEL already exists.");
+            }
+
+            var isClientAlreadyRegistered = await _context.ClientTrips
+                .AnyAsync(ct => ct.IdClientNavigation.Pesel == request.Client.Pesel && ct.IdTrip == idTrip);
+            if (isClientAlreadyRegistered)
+            {
+                throw new InvalidOperationException("Client is already registered for the trip.");
+            }
+
+            var trip = await _context.Trips.FindAsync(idTrip);
+            if (trip == null)
+            {
+                throw new InvalidOperationException("Trip does not exist.");
+            }
+            if (trip.DateFrom <= DateTime.Today)
+            {
+                throw new InvalidOperationException("Cannot register for a trip that has already occurred.");
+            }
+
+            var newClient = new Client
+            {
+                FirstName = request.Client.FirstName,
+                LastName = request.Client.LastName,
+                Email = request.Client.Email,
+                Telephone = request.Client.Telephone,
+                Pesel = request.Client.Pesel
+            };
+
+            var clientTrip = new ClientTrip
+            {
+                IdClientNavigation = newClient,
+                IdTripNavigation = trip,
+                RegisteredAt = DateTime.Now,
+                PaymentDate = request.Client.PaymentDate
+            };
+
+            _context.Clients.Add(newClient);
+            _context.ClientTrips.Add(clientTrip);
+            await _context.SaveChangesAsync();
+
+            return clientTrip.IdClient;
         }
     }
 }

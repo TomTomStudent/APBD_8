@@ -21,5 +21,24 @@ namespace TripsApi.Controllers
             var trips = _tripService.GetTrips(page, pageSize);
             return Ok(trips);
         }
+
+        [HttpPost("{idTrip}/clients")]
+        public async Task<IActionResult> AssignClientToTrip(int idTrip, AssignClientToTrip request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var result = await _tripService.AssignClientToTrip(idTrip, request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
     }
 }
